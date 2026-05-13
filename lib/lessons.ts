@@ -23,9 +23,13 @@ export const LESSONS: Record<string, Lesson[]> = {
   b1: B1_LESSONS,
 };
 
+export function getUnitId(lesson: Lesson): string {
+  return lesson.id ?? lesson.unitKey ?? lesson.unit_key ?? "";
+}
+
 export function getLessonById(id: string): Lesson | undefined {
   for (const level of Object.values(LESSONS)) {
-    const found = level.find((l) => l.id === id);
+    const found = level.find((l) => getUnitId(l) === id);
     if (found) return found;
   }
   return undefined;

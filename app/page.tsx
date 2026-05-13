@@ -10,7 +10,7 @@ import { AnimNum } from "@/components/AnimNum";
 import { XPBar } from "@/components/XPBar";
 import { ProgressRing } from "@/components/ProgressRing";
 import { getDailyTip } from "@/lib/utils";
-import { LESSONS } from "@/lib/lessons";
+import { LESSONS, getUnitId } from "@/lib/lessons";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 
 export default function HomePage() {
@@ -43,7 +43,7 @@ export default function HomePage() {
 
   // Get next incomplete lesson
   const allLessons = Object.values(LESSONS).flat();
-  const nextLesson = allLessons.find((l) => !completedUnits.includes(l.id ?? ""));
+  const nextLesson = allLessons.find((l) => l.words.length > 0 && !completedUnits.includes(getUnitId(l)));
   const dailyPercent = Math.min((dailyLessonsToday / dailyGoal) * 100, 100);
   const dailyDone = dailyLessonsToday >= dailyGoal;
 
@@ -127,7 +127,7 @@ export default function HomePage() {
         {nextLesson && (
           <button
             className="btn-primary animate-fade-in"
-            onClick={() => router.push(`/lesson/${nextLesson.id}`)}
+            onClick={() => router.push(`/lesson/${getUnitId(nextLesson)}`)}
             style={{ marginTop: 16 }}
           >
             {completedUnits.length === 0 ? t.startLesson : t.continueLesson} →{" "}

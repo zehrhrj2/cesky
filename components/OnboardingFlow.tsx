@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useStore } from "@/lib/store";
-import { LESSONS } from "@/lib/lessons";
+import { LESSONS, getUnitId } from "@/lib/lessons";
+import type { Word } from "@/types";
 
 // Allow returning users who already have lesson progress to skip onboarding
 
@@ -123,16 +124,24 @@ function scoreToLevel(score: number, total: number): "a0" | "a1" | "a2" | "b1" {
   return "a0";
 }
 
-// IDs to mark complete when placing above A0
 function getLessonIdsUpTo(level: "a0" | "a1" | "a2" | "b1"): string[] {
   const order: Array<keyof typeof LESSONS> = ["a0", "a1", "a2", "b1"];
   const cutoff = order.indexOf(level);
   const ids: string[] = [];
   for (let i = 0; i < cutoff; i++) {
-    const key = order[i];
-    LESSONS[key].forEach((l) => { if (l.id) ids.push(l.id); });
+    LESSONS[order[i]].forEach((l) => ids.push(getUnitId(l)));
   }
-  return ids;
+  return ids.filter(Boolean);
+}
+
+function getWordsUpTo(level: "a0" | "a1" | "a2" | "b1"): Word[] {
+  const order: Array<keyof typeof LESSONS> = ["a0", "a1", "a2", "b1"];
+  const cutoff = order.indexOf(level);
+  const words: Word[] = [];
+  for (let i = 0; i < cutoff; i++) {
+    LESSONS[order[i]].forEach((l) => words.push(...l.words));
+  }
+  return words;
 }
 
 const LEVEL_LABELS: Record<string, { ua: string; ru: string; color: string; emoji: string }> = {
@@ -145,7 +154,7 @@ const LEVEL_LABELS: Record<string, { ua: string; ru: string; color: string; emoj
 type Step = "lang" | "assess" | "test" | "result";
 
 export function OnboardingFlow() {
-  const { lang, setLang, completeOnboarding, bulkCompleteUnits, completedUnits, xp } = useStore();
+  const { lang, setLang, completeOnboarding, bulkCompleteUnits, addLearnedWords, completedUnits, xp } = useStore();
   const isReturningUser = completedUnits.length > 0 || xp > 0;
 
   const [step, setStep] = useState<Step>("lang");
@@ -243,7 +252,10 @@ export function OnboardingFlow() {
 
   const handleStart = () => {
     const idsToComplete = getLessonIdsUpTo(placedLevel);
-    if (idsToComplete.length > 0) bulkCompleteUnits(idsToComplete);
+    if (idsToComplete.length > 0) {
+      bulkCompleteUnits(idsToComplete);
+      addLearnedWords(getWordsUpTo(placedLevel));
+    }
     completeOnboarding();
   };
 

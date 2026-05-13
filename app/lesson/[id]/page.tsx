@@ -15,7 +15,7 @@ type LessonStep = "vocab" | "sentences" | "quiz" | "done";
 export default function LessonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { lang, addXp, addWords, completeUnit, addLearnedWords } = useStore();
+  const { lang, addXp, addWords, completeUnit, addLearnedWords, checkAndUpdateStreak } = useStore();
   const t = L[lang] as unknown as Record<string, string>;
 
   const lesson = getLessonById(id);
@@ -114,7 +114,8 @@ export default function LessonPage({ params }: { params: Promise<{ id: string }>
   const finishLesson = () => {
     const xpReward = (lesson.xpReward || 50) + quizScore * 5;
     addXp(xpReward - quizScore * 5);
-    completeUnit(lesson.id ?? "");
+    completeUnit(lesson.id ?? lesson.unitKey ?? lesson.unit_key ?? "");
+    checkAndUpdateStreak();
     setStep("done");
   };
 

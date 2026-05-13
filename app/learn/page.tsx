@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store";
 import { L } from "@/lib/localization";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
-import { LESSONS, LEVEL_INFO } from "@/lib/lessons";
+import { LESSONS, LEVEL_INFO, getUnitId } from "@/lib/lessons";
 
 export default function LearnPage() {
   const router = useRouter();
@@ -106,7 +106,7 @@ export default function LearnPage() {
 
         {levels.map(([levelKey, lessons], levelIndex) => {
           const levelInfo = LEVEL_INFO[levelKey as keyof typeof LEVEL_INFO];
-          const isLevelLocked = levelIndex > 0 && lessons.every((l) => !completedUnits.includes(l.id ?? "")) && LESSONS[Object.keys(LESSONS)[levelIndex - 1]].every((l) => !completedUnits.includes(l.id ?? ""));
+          const isLevelLocked = levelIndex > 0 && lessons.every((l) => !completedUnits.includes(getUnitId(l))) && LESSONS[Object.keys(LESSONS)[levelIndex - 1]].every((l) => !completedUnits.includes(getUnitId(l)));
 
           return (
             <div key={levelKey} style={{ marginBottom: 24 }}>
@@ -141,7 +141,7 @@ export default function LearnPage() {
                   </div>
                   <div style={{ fontSize: 11, color: "var(--text2)" }}>
                     {completedUnits.filter((id) =>
-                      lessons.some((l) => (l.id ?? "") === id)
+                      lessons.some((l) => getUnitId(l) === id)
                     ).length}/{lessons.length}{" "}
                     {lang === "ua" ? "уроків" : "уроков"}
                   </div>
@@ -151,17 +151,17 @@ export default function LearnPage() {
               {/* Lessons */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {lessons.map((unit, unitIndex) => {
-                  const completed = completedUnits.includes(unit.id ?? "");
+                  const completed = completedUnits.includes(getUnitId(unit));
                   const prevCompleted =
                     unitIndex === 0
                       ? levelIndex === 0
                         ? true
                         : completedUnits.some((id) =>
                             LESSONS[Object.keys(LESSONS)[levelIndex - 1]].some(
-                              (l) => (l.id ?? "") === id
+                              (l) => getUnitId(l) === id
                             )
                           )
-                      : completedUnits.includes(lessons[unitIndex - 1]?.id ?? "");
+                      : completedUnits.includes(getUnitId(lessons[unitIndex - 1]));
                   const hasContent = unit.words.length > 0;
                   const unlocked = prevCompleted && hasContent;
                   const canStart = unlocked;
@@ -170,7 +170,7 @@ export default function LearnPage() {
                     <button
                       key={unit.id ?? unitIndex}
                       className="app-card"
-                      onClick={() => canStart && unit.id && router.push(`/lesson/${unit.id}`)}
+                      onClick={() => canStart && router.push(`/lesson/${getUnitId(unit)}`)}
                       style={{
                         display: "flex",
                         alignItems: "center",
