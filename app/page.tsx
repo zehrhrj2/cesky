@@ -26,6 +26,7 @@ export default function HomePage() {
     dailyGoal,
     checkAndUpdateStreak,
     hasCompletedOnboarding,
+    learnedWords,
   } = useStore();
 
   const t = L[lang];
@@ -132,6 +133,33 @@ export default function HomePage() {
           >
             {completedUnits.length === 0 ? t.startLesson : t.continueLesson} →{" "}
             {nextLesson.icon} {t[nextLesson.unitKey as keyof typeof t] as string}
+          </button>
+        )}
+
+        {/* Review card — appears once user has enough words to practice */}
+        {learnedWords.length >= 10 && (
+          <button
+            className="app-card app-card-interactive animate-fade-in"
+            onClick={() => router.push("/review")}
+            style={{
+              marginTop: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              width: "100%",
+              textAlign: "left",
+              borderColor: "var(--accent)",
+            }}
+          >
+            <div style={{ fontSize: 32 }}>🔄</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>{t.reviewWords}</div>
+              <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 2 }}>
+                {learnedWords.length}{" "}
+                {lang === "ua" ? "слів у словнику" : "слов в словаре"} · +{Math.min(learnedWords.length, 15) * 5} XP
+              </div>
+            </div>
+            <div style={{ color: "var(--accent)", fontSize: 18, fontWeight: 700 }}>→</div>
           </button>
         )}
 

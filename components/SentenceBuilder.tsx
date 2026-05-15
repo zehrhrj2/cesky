@@ -71,6 +71,15 @@ const GRAMMAR_DICT: Record<string, { ua: string; ru: string }> = {
 
 const PUNCT = new Set([",", ".", "!", "?", ":", ";"]);
 
+function fisherYates(arr: number[]): number[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function getWordHint(word: string, knownWords: Set<string>, lang: Lang): string | null {
   if (PUNCT.has(word)) return null;
   const lower = word.toLowerCase();
@@ -107,7 +116,14 @@ export function SentenceBuilder({
   const knownWords = new Set(lessonWords.map((w) => w.cz.toLowerCase()));
 
   useEffect(() => {
-    const shuffled = [...exercise.cz.map((_, i) => i)].sort(() => Math.random() - 0.5);
+    const indices = exercise.cz.map((_, i) => i);
+    const correctStr = exercise.correctOrder.join(",");
+    let shuffled = fisherYates(indices);
+    // Guard: if the shuffle accidentally produced the correct order, reshuffle.
+    // Only possible on short sentences; loop terminates quickly.
+    while (indices.length > 1 && shuffled.join(",") === correctStr) {
+      shuffled = fisherYates(indices);
+    }
     setAvailable(shuffled);
     setPlaced([]);
     setChecked(false);

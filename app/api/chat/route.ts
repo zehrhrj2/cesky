@@ -12,11 +12,8 @@ export async function POST(req: NextRequest) {
 
   if (!apiKey) {
     return NextResponse.json(
-      {
-        reply:
-          "⚠️ GROQ_API_KEY není nastaven.\n(GROQ_API_KEY не встановлено. Додайте ключ у .env.local)",
-      },
-      { status: 200 }
+      { error: "service_unavailable" },
+      { status: 503 }
     );
   }
 
@@ -63,14 +60,16 @@ export async function POST(req: NextRequest) {
       console.error("Groq API error:", groqResponse.status, errorData);
 
       if (groqResponse.status === 401) {
-        return NextResponse.json({
-          reply: "⚠️ Neplatný API klíč.\n(Неправильний API ключ. Перевірте GROQ_API_KEY.)",
-        });
+        return NextResponse.json(
+          { error: "service_unavailable" },
+          { status: 503 }
+        );
       }
 
-      return NextResponse.json({
-        reply: "⚠️ Chyba serveru. Zkuste to znovu.\n(Помилка сервера. Спробуйте ще раз.)",
-      });
+      return NextResponse.json(
+        { error: "server_error" },
+        { status: 502 }
+      );
     }
 
     const data = await groqResponse.json();
@@ -81,9 +80,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ reply });
   } catch (error) {
     console.error("Chat API error:", error);
-    return NextResponse.json({
-      reply:
-        "⚠️ Chyba připojení.\n(Помилка з'єднання. Перевірте інтернет-з'єднання.)",
-    });
+    return NextResponse.json(
+      { error: "network_error" },
+      { status: 503 }
+    );
   }
 }

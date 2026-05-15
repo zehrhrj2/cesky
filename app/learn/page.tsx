@@ -237,9 +237,9 @@ export default function LearnPage() {
                         )}
                       </div>
 
-                      {canStart && !completed && (
-                        <div style={{ color: levelInfo.color, fontWeight: 700, fontSize: 18 }}>
-                          →
+                      {canStart && (
+                        <div style={{ color: completed ? "var(--text2)" : levelInfo.color, fontWeight: 700, fontSize: 18 }}>
+                          {completed ? "↺" : "→"}
                         </div>
                       )}
                     </button>

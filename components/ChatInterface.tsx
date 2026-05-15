@@ -15,6 +15,7 @@ export function ChatInterface() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showTranslation, setShowTranslation] = useState(true);
+  const [chatError, setChatError] = useState<"unavailable" | "transient" | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -24,6 +25,7 @@ export function ChatInterface() {
 
   const selectMode = (modeKey: string) => {
     setMode(modeKey);
+    setChatError(null);
     setMessages([
       { role: "assistant", text: getChatGreeting(modeKey, lang) },
     ]);
@@ -33,6 +35,7 @@ export function ChatInterface() {
     if (!input.trim() || loading || !mode) return;
     const userText = input.trim();
     setInput("");
+    setChatError(null);
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setLoading(true);
     incrementChatMessages();
@@ -53,25 +56,25 @@ export function ChatInterface() {
         }),
       });
 
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 503 || data.error === "service_unavailable") {
+          setChatError("unavailable");
+        } else {
+          setChatError("transient");
+        }
+        setLoading(false);
+        return;
+      }
+
       const data = await res.json();
-      const reply =
-        data.reply ||
-        (lang === "ua"
-          ? "Promiňte, zkuste to znovu.\n(Вибачте, спробуйте ще раз.)"
-          : "Promiňte, zkuste to znovu.\n(Извините, попробуйте ещё раз.)");
+      const reply = data.reply || (lang === "ua"
+        ? "Promiňte, zkuste to znovu.\n(Вибачте, спробуйте ще раз.)"
+        : "Promiňte, zkuste to znovu.\n(Извините, попробуйте ещё раз.)");
 
       setMessages((prev) => [...prev, { role: "assistant", text: reply }]);
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text:
-            lang === "ua"
-              ? "⚠️ Chyba připojení.\n(Помилка з'єднання. Перевірте GROQ_API_KEY.)"
-              : "⚠️ Chyba připojení.\n(Ошибка соединения. Проверьте GROQ_API_KEY.)",
-        },
-      ]);
+      setChatError("transient");
     }
 
     setLoading(false);
@@ -281,46 +284,123 @@ export function ChatInterface() {
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input area */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          padding: "12px 0 4px",
-          borderTop: "1px solid var(--card-border)",
-          flexShrink: 0,
-        }}
-      >
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-          placeholder={t.chatPlaceholder}
-          className="app-input"
-          style={{ flex: 1 }}
-        />
-        <button
-          onClick={sendMessage}
-          disabled={loading || !input.trim()}
+      {/* Error states — shown instead of / above the input */}
+      {chatError === "unavailable" && (
+        <div
           style={{
-            padding: "12px 20px",
-            background: "var(--gradient)",
-            color: "#fff",
-            borderRadius: 14,
-            fontWeight: 700,
-            fontSize: 14,
-            border: "none",
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading || !input.trim() ? 0.5 : 1,
-            transition: "opacity 0.2s",
-            fontFamily: "inherit",
+            padding: "14px 16px",
+            borderTop: "1px solid var(--card-border)",
+            background: "var(--card)",
+            borderRadius: "0 0 14px 14px",
             flexShrink: 0,
           }}
         >
-          {t.send}
-        </button>
-      </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)", marginBottom: 4 }}>
+            💬 {lang === "ua" ? "AI чат наразі недоступний" : "AI чат сейчас недоступен"}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text2)", lineHeight: 1.5 }}>
+            {lang === "ua"
+              ? "Сервіс тимчасово не відповідає. Спробуйте пізніше."
+              : "Сервис временно не отвечает. Попробуйте позже."}
+          </div>
+        </div>
+      )}
+
+      {chatError === "transient" && (
+        <div
+          style={{
+            padding: "10px 0 4px",
+            borderTop: "1px solid var(--card-border)",
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              padding: "8px 12px",
+              background: "rgba(239,68,68,0.08)",
+              border: "1px solid rgba(239,68,68,0.25)",
+              borderRadius: 10,
+              fontSize: 12,
+              color: "var(--red)",
+              marginBottom: 8,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span>
+              {lang === "ua" ? "Помилка з'єднання. Спробуйте ще раз." : "Ошибка соединения. Попробуйте ещё раз."}
+            </span>
+            <button
+              onClick={() => setChatError(null)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--red)", fontWeight: 700, fontSize: 14, padding: "0 4px" }}
+            >
+              ×
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+              placeholder={t.chatPlaceholder}
+              className="app-input"
+              style={{ flex: 1 }}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={loading || !input.trim()}
+              style={{ padding: "12px 20px", background: "var(--gradient)", color: "#fff", borderRadius: 14, fontWeight: 700, fontSize: 14, border: "none", cursor: loading ? "not-allowed" : "pointer", opacity: loading || !input.trim() ? 0.5 : 1, transition: "opacity 0.2s", fontFamily: "inherit", flexShrink: 0 }}
+            >
+              {t.send}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Normal input area */}
+      {!chatError && (
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            padding: "12px 0 4px",
+            borderTop: "1px solid var(--card-border)",
+            flexShrink: 0,
+          }}
+        >
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+            placeholder={t.chatPlaceholder}
+            className="app-input"
+            style={{ flex: 1 }}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={loading || !input.trim()}
+            style={{
+              padding: "12px 20px",
+              background: "var(--gradient)",
+              color: "#fff",
+              borderRadius: 14,
+              fontWeight: 700,
+              fontSize: 14,
+              border: "none",
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading || !input.trim() ? 0.5 : 1,
+              transition: "opacity 0.2s",
+              fontFamily: "inherit",
+              flexShrink: 0,
+            }}
+          >
+            {t.send}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
