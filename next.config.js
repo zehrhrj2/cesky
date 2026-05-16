@@ -1,8 +1,12 @@
 /** @type {import('next').NextConfig} */
+const isMobileBuild = process.env.NEXT_EXPORT === "true";
+
 const nextConfig = {
   reactStrictMode: true,
-  output: "export",
-  trailingSlash: true,
+  ...(isMobileBuild && {
+    output: "export",
+    trailingSlash: true,
+  }),
   images: { unoptimized: true },
 };
 
