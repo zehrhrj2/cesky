@@ -15,6 +15,7 @@ interface AppStore extends UserStats {
   hasCompletedOnboarding: boolean;
   hasCompletedAlphabet: boolean;
   learnedWords: Word[];
+  wordScores: Record<string, number>;
 
   // Actions
   setLang: (lang: Lang) => void;
@@ -29,6 +30,7 @@ interface AppStore extends UserStats {
   completeOnboarding: () => void;
   completeAlphabet: () => void;
   addLearnedWords: (words: Word[]) => void;
+  updateWordScore: (cz: string, correct: boolean) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -50,6 +52,7 @@ export const useStore = create<AppStore>()(
       hasCompletedOnboarding: false,
       hasCompletedAlphabet: false,
       learnedWords: [],
+      wordScores: {},
 
       setLang: (lang) => set({ lang }),
       setDark: (dark) => set({ dark }),
@@ -88,6 +91,16 @@ export const useStore = create<AppStore>()(
           const newWords = words.filter((w) => !existing.has(w.cz));
           return newWords.length ? { learnedWords: [...state.learnedWords, ...newWords] } : state;
         }),
+
+      // Spaced repetition: correct answers reduce score (word shown less often),
+      // incorrect answers increase score (word surfaces more often).
+      updateWordScore: (cz, correct) =>
+        set((state) => ({
+          wordScores: {
+            ...state.wordScores,
+            [cz]: Math.max(0, (state.wordScores[cz] ?? 0) + (correct ? -1 : 2)),
+          },
+        })),
 
       incrementChatMessages: () =>
         set((state) => ({
@@ -131,6 +144,7 @@ export const useStore = create<AppStore>()(
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         hasCompletedAlphabet: state.hasCompletedAlphabet,
         learnedWords: state.learnedWords,
+        wordScores: state.wordScores,
       }),
     }
   )

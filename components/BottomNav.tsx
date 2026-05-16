@@ -7,7 +7,7 @@ import { L } from "@/lib/localization";
 const NAV_ITEMS = [
   { path: "/", key: "home", icon: "🏠" },
   { path: "/learn", key: "learn", icon: "📚" },
-  { path: "/grammar", key: "grammar", icon: "🧠" },
+  { path: "/practice", key: "practice", icon: "🎯" },
   { path: "/chat", key: "chat", icon: "💬" },
   { path: "/profile", key: "profile", icon: "👤" },
 ] as const;
