@@ -1,10 +1,5 @@
 {
-  "/api/chat/route": "app/api/chat/route.js",
   "/page": "app/page.js",
-  "/lesson/[id]/page": "app/lesson/[id]/page.js",
-  "/learn/page": "app/learn/page.js",
-  "/grammar/page": "app/grammar/page.js",
   "/chat/page": "app/chat/page.js",
-  "/profile/page": "app/profile/page.js",
-  "/alphabet/page": "app/alphabet/page.js"
+  "/lesson/[id]/page": "app/lesson/[id]/page.js"
 }

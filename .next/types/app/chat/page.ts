@@ -1,4 +1,4 @@
-// File: C:\Users\kodym\Desktop\my projects\czech-learning-next\app\chat\page.tsx
+// File: C:\Users\zehrh\Desktop\cesky\app\chat\page.tsx
 import * as entry from '../../../../app/chat/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
