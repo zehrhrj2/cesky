@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:mobile": "cross-env NEXT_EXPORT=true next build",
+    "build:mobile": "cross-env NEXT_EXPORT=true NEXT_PUBLIC_API_URL=https://cesky-mu.vercel.app next build",
     "start": "next start",
     "lint": "next lint"
   },
