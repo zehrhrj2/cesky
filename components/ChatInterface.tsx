@@ -40,20 +40,10 @@ export function ChatInterface() {
     setLoading(true);
     incrementChatMessages();
 
-    const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
-    if (!apiKey) {
-      setChatError("unavailable");
-      setLoading(false);
-      return;
-    }
-
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const res = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile",
           messages: [
@@ -70,17 +60,13 @@ export function ChatInterface() {
         }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          setChatError("unavailable");
-        } else {
-          setChatError("transient");
-        }
+        setChatError(data.error === "unavailable" ? "unavailable" : "transient");
         setLoading(false);
         return;
       }
-
-      const data = await res.json();
       const reply = data.choices?.[0]?.message?.content || (lang === "ua"
         ? "Promiňte, zkuste to znovu.\n(Вибачте, спробуйте ще раз.)"
         : "Promiňte, zkuste to znovu.\n(Извините, попробуйте ещё раз.)");
