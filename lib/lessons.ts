@@ -1,5 +1,6 @@
 import type { Lesson } from "@/types";
 import { A0_LESSONS } from "@/lib/data/a0-lessons";
+import { A0_REVIEW } from "@/lib/data/a0-review";
 import { A1_LESSONS } from "@/lib/data/a1-lessons";
 import { A1_EXTRA_1 } from "@/lib/data/a1-extra-1";
 import { A1_EXTRA_2 } from "@/lib/data/a1-extra-2";
@@ -16,8 +17,20 @@ import { A2_EXTRA_8 } from "@/lib/data/a2-extra-8";
 import { A2_EXTRA_9 } from "@/lib/data/a2-extra-9";
 import { B1_LESSONS } from "@/lib/data/b1-lessons";
 
+function interleaveReviews(lessons: Lesson[], reviews: Lesson[]): Lesson[] {
+  const result: Lesson[] = [];
+  for (let i = 0; i < lessons.length; i++) {
+    result.push(lessons[i]);
+    if ((i + 1) % 2 === 0) {
+      const reviewIdx = Math.floor(i / 2);
+      if (reviews[reviewIdx]) result.push(reviews[reviewIdx]);
+    }
+  }
+  return result;
+}
+
 export const LESSONS: Record<string, Lesson[]> = {
-  a0: A0_LESSONS,
+  a0: interleaveReviews(A0_LESSONS, A0_REVIEW),
   a1: [...A1_LESSONS, ...A1_EXTRA_1, ...A1_EXTRA_2, ...A1_EXTRA_3],
   a2: [...A2_LESSONS, ...A2_EXTRA_1, ...A2_EXTRA_2, ...A2_EXTRA_3, ...A2_EXTRA_4, ...A2_EXTRA_5, ...A2_EXTRA_6, ...A2_EXTRA_7, ...A2_EXTRA_8, ...A2_EXTRA_9],
   b1: B1_LESSONS,
