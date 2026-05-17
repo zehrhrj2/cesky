@@ -281,6 +281,7 @@ export default function LessonPage({ params }: { params: Promise<{ id: string }>
           wordsCount={lesson.words.length}
           xpEarned={(lesson.xpReward || 50) + quizScore * 15}
           lang={lang}
+          isReview={(lesson.unitKey ?? lesson.unit_key ?? "").startsWith("unitReview")}
         />
       )}
     </div>

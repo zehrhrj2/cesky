@@ -11,6 +11,7 @@ interface LessonCompleteProps {
   wordsCount: number;
   xpEarned: number;
   lang: Lang;
+  isReview?: boolean;
   onContinue?: () => void;
 }
 
@@ -20,6 +21,7 @@ export function LessonComplete({
   wordsCount,
   xpEarned,
   lang,
+  isReview,
   onContinue,
 }: LessonCompleteProps) {
   const router = useRouter();
@@ -126,6 +128,14 @@ export function LessonComplete({
           </div>
         </div>
       </div>
+
+      {isReview && (
+        <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 16, lineHeight: 1.6 }}>
+          {lang === "ua"
+            ? "Для додаткової практики повторіть уроки або перейдіть до списку слів у розділі «Профіль»"
+            : "Для дополнительной практики повторите уроки или перейдите к списку слов в разделе «Профиль»"}
+        </div>
+      )}
 
       <button
         className="btn-primary"
