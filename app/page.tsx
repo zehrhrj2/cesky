@@ -9,7 +9,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { AnimNum } from "@/components/AnimNum";
 import { XPBar } from "@/components/XPBar";
 import { ProgressRing } from "@/components/ProgressRing";
-import { getDailyTip } from "@/lib/utils";
+import { getDailyTip, formatStreakText } from "@/lib/utils";
 import { LESSONS, getUnitId } from "@/lib/lessons";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 
@@ -27,11 +27,11 @@ export default function HomePage() {
     checkAndUpdateStreak,
     hasCompletedOnboarding,
     learnedWords,
+    completedUnits,
   } = useStore();
 
   const t = L[lang];
   const level = getLevel(xp);
-  const completedUnits = useStore((s) => s.completedUnits);
 
   useEffect(() => {
     checkAndUpdateStreak();
@@ -156,7 +156,8 @@ export default function HomePage() {
               <div style={{ fontSize: 15, fontWeight: 700 }}>{t.reviewWords}</div>
               <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 2 }}>
                 {learnedWords.length}{" "}
-                {lang === "ua" ? "слів у словнику" : "слов в словаре"} · +{Math.min(learnedWords.length, 15) * 5} XP
+                {lang === "ua" ? "слів у словнику" : "слов в словаре"}{" "}
+                · +{Math.min(learnedWords.length, 15) * 5} XP
               </div>
             </div>
             <div style={{ color: "var(--accent)", fontSize: 18, fontWeight: 700 }}>→</div>
@@ -221,7 +222,7 @@ export default function HomePage() {
             })}
           </div>
           <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 8, textAlign: "center" }}>
-            {streak} {lang === "ua" ? "днів поспіль" : "дней подряд"}
+            {formatStreakText(streak, lang)}
           </div>
         </div>
 

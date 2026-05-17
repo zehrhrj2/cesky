@@ -47,7 +47,9 @@ export function BottomNav() {
           <button
             key={item.path}
             className={`nav-item ${active ? "active" : ""}`}
-            onClick={() => router.push(item.path)}
+            onClick={() => !active && router.push(item.path)}
+            aria-label={label}
+            aria-current={active ? "page" : undefined}
           >
             <span style={{ fontSize: 20 }}>{item.icon}</span>
             <span style={{ fontSize: 10, fontWeight: 700 }}>{label}</span>

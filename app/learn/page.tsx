@@ -7,6 +7,12 @@ import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { LESSONS, LEVEL_INFO, getUnitId } from "@/lib/lessons";
 
+function isPrevLevelStarted(levelIndex: number, levels: [string, typeof LESSONS[string]][], completedUnits: string[]): boolean {
+  if (levelIndex === 0) return true;
+  const prevLessons = levels[levelIndex - 1][1];
+  return prevLessons.some((l) => completedUnits.includes(getUnitId(l)));
+}
+
 export default function LearnPage() {
   const router = useRouter();
   const { lang, completedUnits, hasCompletedAlphabet } = useStore();
@@ -21,7 +27,9 @@ export default function LearnPage() {
         <div style={{ marginTop: 16, marginBottom: 20 }}>
           <div style={{ fontSize: 20, fontWeight: 800 }}>{t.learn}</div>
           <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 2 }}>
-            {lang === "ua" ? "Ваш шлях до чеської мови" : "Ваш путь к чешскому языку"}
+            {completedUnits.length === 0
+              ? (lang === "ua" ? "Починайте з алфавіту" : "Начните с алфавита")
+              : (lang === "ua" ? `${completedUnits.length} уроків завершено` : `${completedUnits.length} уроков завершено`)}
           </div>
         </div>
 
@@ -106,7 +114,7 @@ export default function LearnPage() {
 
         {levels.map(([levelKey, lessons], levelIndex) => {
           const levelInfo = LEVEL_INFO[levelKey as keyof typeof LEVEL_INFO];
-          const isLevelLocked = levelIndex > 0 && lessons.every((l) => !completedUnits.includes(getUnitId(l))) && LESSONS[Object.keys(LESSONS)[levelIndex - 1]].every((l) => !completedUnits.includes(getUnitId(l)));
+          const isLevelLocked = levelIndex > 0 && !isPrevLevelStarted(levelIndex, levels, completedUnits);
 
           return (
             <div key={levelKey} style={{ marginBottom: 24 }}>
@@ -256,12 +264,12 @@ export default function LearnPage() {
           style={{ borderLeft: "4px solid var(--accent)", marginTop: 8 }}
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 4 }}>
-            🚀 {lang === "ua" ? "Продовжуйте!" : "Продолжайте!"}
+            💡 {lang === "ua" ? "Порада" : "Совет"}
           </div>
           <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6 }}>
             {lang === "ua"
-              ? "Завершіть A0 рівень, щоб відкрити AI-чат та розмовні вправи!"
-              : "Завершите уровень A0, чтобы открыть AI-чат и разговорные упражнения!"}
+              ? "Кожен урок містить слова, речення і тест. Завершіть усі три — отримайте повний XP!"
+              : "Каждый урок содержит слова, предложения и тест. Завершите все три — получите полный XP!"}
           </div>
         </div>
       </div>

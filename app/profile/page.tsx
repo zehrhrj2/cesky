@@ -11,6 +11,7 @@ import { AnimNum } from "@/components/AnimNum";
 import { XPBar } from "@/components/XPBar";
 import { getAchievements } from "@/lib/utils";
 import { speakCzech } from "@/lib/speech";
+import { LESSONS, LEVEL_INFO, getUnitId } from "@/lib/lessons";
 
 type VocabDiffFilter = "all" | WordDifficulty;
 
@@ -299,21 +300,19 @@ export default function ProfilePage() {
         {/* Progress overview */}
         <div className="app-card" style={{ marginTop: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t.progress}</div>
-          {[
-            { label: "A0", total: 7, completed: completedUnits.filter(id => ["greetings","numbers","food","family","colors","transport","school","shopping"].includes(id)).length, color: "#f97316" },
-            { label: "A1", total: 2, completed: completedUnits.filter(id => ["verbs_basic","body"].includes(id)).length, color: "#3b82f6" },
-            { label: "A2", total: 1, completed: completedUnits.filter(id => ["weather"].includes(id)).length, color: "#a855f7" },
-            { label: "B1", total: 1, completed: completedUnits.filter(id => ["work"].includes(id)).length, color: "#22c55e" },
-          ].map((lvl) => {
-            const pct = Math.min((lvl.completed / lvl.total) * 100, 100);
+          {Object.entries(LESSONS).map(([levelKey, lessons]) => {
+            const info = LEVEL_INFO[levelKey as keyof typeof LEVEL_INFO];
+            const total = lessons.length;
+            const done = lessons.filter((l) => completedUnits.includes(getUnitId(l))).length;
+            const pct = total > 0 ? Math.min((done / total) * 100, 100) : 0;
             return (
-              <div key={lvl.label} style={{ marginBottom: 10 }}>
+              <div key={levelKey} style={{ marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: lvl.color }}>{lvl.label}</span>
-                  <span style={{ fontSize: 11, color: "var(--text2)" }}>{lvl.completed}/{lvl.total}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: info.color }}>{info.label}</span>
+                  <span style={{ fontSize: 11, color: "var(--text2)" }}>{done}/{total}</span>
                 </div>
                 <div className="progress-bar-track">
-                  <div style={{ height: "100%", width: `${pct}%`, background: lvl.color, borderRadius: 3, transition: "width 0.5s ease" }} />
+                  <div style={{ height: "100%", width: `${pct}%`, background: info.color, borderRadius: 3, transition: "width 0.5s ease" }} />
                 </div>
               </div>
             );

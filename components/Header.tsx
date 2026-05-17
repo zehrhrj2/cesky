@@ -35,6 +35,7 @@ export function Header({ showBack, onBack, title }: HeaderProps) {
       >
         <button
           onClick={onBack}
+          aria-label="Назад"
           style={{
             fontSize: 20,
             color: "var(--text)",
@@ -42,6 +43,7 @@ export function Header({ showBack, onBack, title }: HeaderProps) {
             border: "none",
             cursor: "pointer",
             padding: "4px 8px",
+            lineHeight: 1,
           }}
         >
           ←
@@ -90,6 +92,7 @@ export function Header({ showBack, onBack, title }: HeaderProps) {
         {/* Language toggle */}
         <button
           onClick={() => setLang(lang === "ua" ? "ru" : "ua")}
+          aria-label={lang === "ua" ? "Переключити на Русский" : "Переключити на Українська"}
           style={{
             fontSize: 12,
             fontWeight: 700,
@@ -108,12 +111,14 @@ export function Header({ showBack, onBack, title }: HeaderProps) {
         {/* Dark mode toggle */}
         <button
           onClick={handleThemeToggle}
+          aria-label={dark ? "Увімкнути світлу тему" : "Увімкнути темну тему"}
           style={{
             fontSize: 18,
             background: "none",
             border: "none",
             cursor: "pointer",
             lineHeight: 1,
+            padding: 4,
           }}
         >
           {dark ? "☀️" : "🌙"}

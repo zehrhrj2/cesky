@@ -114,8 +114,8 @@ export const useStore = create<AppStore>()(
 
       incrementChatMessages: () =>
         set((state) => ({
-          chatMessagesCount: state.chatMessagesCount + 1,
           chatMessages: (state.chatMessages || 0) + 1,
+          chatMessagesCount: state.chatMessagesCount + 1,
         })),
 
       checkAndUpdateStreak: () => {
