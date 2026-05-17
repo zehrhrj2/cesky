@@ -71,20 +71,19 @@ export async function speakCzech(text: string, rate = 0.85): Promise<void> {
 
   const tts = await getTTS();
   if (tts) {
-    addDebugLog("speakCzech: calling tts.stop()");
-    try { await tts.stop(); addDebugLog("tts.stop(): OK"); } catch (e) { addDebugLog(`tts.stop(): err (ok) ${e}`); }
+    addDebugLog("speakCzech: stop()");
+    try { await tts.stop(); addDebugLog("stop(): ok"); } catch (e) { addDebugLog(`stop(): ignored ${e}`); }
 
-    addDebugLog("speakCzech: calling tts.speak()");
-    try {
-      await tts.speak({ text, lang: "cs-CZ", rate, pitch: 1.0, volume: 1.0 });
-      addDebugLog("tts.speak(): SUCCESS");
-      return;
-    } catch (e) {
-      addDebugLog(`tts.speak(): FAILED → ${e}`);
-      // fall through to web
-    }
+    // Fire-and-forget — speak() Promise may never resolve on some Android engines
+    const params = { text, lang: "cs-CZ", rate, pitch: 1.0, volume: 1.0 };
+    addDebugLog(`BEFORE speak: ${JSON.stringify(params).slice(0, 50)}`);
+    (tts.speak(params) as Promise<void>)
+      .then(() => addDebugLog("speak(): RESOLVED ok"))
+      .catch((e: unknown) => addDebugLog(`speak(): REJECTED → ${e}`));
+    addDebugLog("AFTER speak() called");
+    return;
   } else {
-    addDebugLog("speakCzech: no native TTS, using web fallback");
+    addDebugLog("speakCzech: no native TTS");
   }
 
   // Web fallback (desktop / browser builds)
