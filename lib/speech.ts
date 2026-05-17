@@ -2,20 +2,57 @@
 
 import { Capacitor } from "@capacitor/core";
 
-// ── TTS ───────────────────────────────────────────────────────────────────────
+// ── Plugin singletons ─────────────────────────────────────────────────────────
+// undefined = not yet resolved, null = not available, object = ready to use.
+// We load each plugin once and cache it to avoid repeated dynamic imports.
 
-async function getNativeTTS() {
-  if (typeof window === "undefined" || !Capacitor.isNativePlatform()) return null;
-  try {
-    const { TextToSpeech } = await import("@capacitor-community/text-to-speech");
-    return TextToSpeech;
-  } catch {
-    return null;
-  }
+type TTSPlugin = Awaited<ReturnType<typeof import("@capacitor-community/text-to-speech")["TextToSpeech"]["speak"]>> extends void
+  ? { speak: (o: TTSSpeakOptions) => Promise<void>; stop: () => Promise<void> }
+  : never;
+
+interface TTSSpeakOptions {
+  text: string;
+  lang: string;
+  rate: number;
+  pitch: number;
+  volume: number;
 }
 
-// Android WebView returns an empty voices array until the voiceschanged event
-// fires. Wait up to 1.5 s before giving up and using whatever is available.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _tts: any | null | undefined = undefined;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _sr: any | null | undefined = undefined;
+
+async function getTTS() {
+  if (_tts !== undefined) return _tts;
+  if (typeof window === "undefined" || !Capacitor.isNativePlatform()) {
+    return (_tts = null);
+  }
+  try {
+    const { TextToSpeech } = await import("@capacitor-community/text-to-speech");
+    _tts = TextToSpeech;
+  } catch {
+    _tts = null;
+  }
+  return _tts;
+}
+
+async function getSR() {
+  if (_sr !== undefined) return _sr;
+  if (typeof window === "undefined" || !Capacitor.isNativePlatform()) {
+    return (_sr = null);
+  }
+  try {
+    const { SpeechRecognition } = await import("@capacitor-community/speech-recognition");
+    _sr = SpeechRecognition;
+  } catch {
+    _sr = null;
+  }
+  return _sr;
+}
+
+// ── Web voice helper ──────────────────────────────────────────────────────────
+
 async function getWebVoices(): Promise<SpeechSynthesisVoice[]> {
   const voices = window.speechSynthesis.getVoices();
   if (voices.length > 0) return voices;
@@ -29,27 +66,28 @@ async function getWebVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
+// ── TTS ───────────────────────────────────────────────────────────────────────
+
 export async function speakCzech(text: string, rate = 0.85): Promise<void> {
   if (typeof window === "undefined") return;
 
-  // Native: Capacitor TTS plugin — reliable on Android/iOS without needing
-  // Czech voices installed on the device's Web Speech engine.
-  const tts = await getNativeTTS();
+  const tts = await getTTS();
   if (tts) {
+    // stop() throws if nothing is currently playing on some engines —
+    // wrap it separately so it never prevents speak() from running.
+    try { await tts.stop(); } catch { /* nothing was playing */ }
     try {
-      await tts.stop(); // stop any current speech before starting new one
       await tts.speak({ text, lang: "cs-CZ", rate, pitch: 1.0, volume: 1.0 });
       return;
     } catch {
-      // fall through to web fallback
+      // native speak failed — fall through to web
     }
   }
 
-  // Web: browser speechSynthesis (works on desktop and web builds)
+  // Web fallback (desktop / browser builds)
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const voices = await getWebVoices();
-  // Small delay after cancel prevents silent failure in some WebView builds
   await new Promise<void>((r) => setTimeout(r, 50));
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "cs-CZ";
@@ -65,13 +103,12 @@ export async function speakCzechSlow(text: string): Promise<void> {
 
 export async function stopSpeaking(): Promise<void> {
   if (typeof window === "undefined") return;
-  const tts = await getNativeTTS();
+  const tts = await getTTS();
   if (tts) {
-    try { await tts.stop(); return; } catch {}
+    try { await tts.stop(); } catch { /* nothing was playing */ }
+    return;
   }
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-  }
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 }
 
 export function isSpeechSupported(): boolean {
@@ -79,21 +116,11 @@ export function isSpeechSupported(): boolean {
   return Capacitor.isNativePlatform() || "speechSynthesis" in window;
 }
 
-// ── Speech Recognition ────────────────────────────────────────────────────────
+// ── Speech recognition ────────────────────────────────────────────────────────
 
 export interface SpeechRecognitionResult {
   transcript: string;
   confidence: number;
-}
-
-async function getNativeSR() {
-  if (typeof window === "undefined" || !Capacitor.isNativePlatform()) return null;
-  try {
-    const { SpeechRecognition } = await import("@capacitor-community/speech-recognition");
-    return SpeechRecognition;
-  } catch {
-    return null;
-  }
 }
 
 export async function startSpeechRecognition(
@@ -103,10 +130,10 @@ export async function startSpeechRecognition(
 ): Promise<(() => void) | null> {
   if (typeof window === "undefined") return null;
 
-  // Native path: Capacitor speech recognition plugin
-  const sr = await getNativeSR();
+  const sr = await getSR();
   if (sr) {
     try {
+      // Request permission if not already granted
       const perms = await sr.checkPermissions();
       if (perms.speechRecognition !== "granted") {
         const req = await sr.requestPermissions();
@@ -117,7 +144,7 @@ export async function startSpeechRecognition(
         }
       }
 
-      // Listen for results before calling start so we don't miss them
+      // Register the result listener BEFORE start() so we don't miss the event
       const listener = await sr.addListener(
         "partialResults",
         (data: { matches?: string[] }) => {
@@ -147,20 +174,18 @@ export async function startSpeechRecognition(
     }
   }
 
-  // Web fallback: Web Speech API
+  // Web fallback
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
   if (!SR) {
     onError("Speech recognition not supported in this browser");
     return null;
   }
-
   const recognition = new SR();
   recognition.lang = "cs-CZ";
   recognition.continuous = false;
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   recognition.onresult = (event: any) => {
     const r = event.results[0][0];
@@ -169,7 +194,6 @@ export async function startSpeechRecognition(
   recognition.onend = onEnd;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   recognition.onerror = (event: any) => onError(event.error);
-
   recognition.start();
   return () => recognition.stop();
 }
