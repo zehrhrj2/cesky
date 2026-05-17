@@ -1,21 +1,5 @@
 "use client";
 
-import { Capacitor } from "@capacitor/core";
-
-// Lazily import the native TTS plugin only when running on a native platform.
-// The dynamic import keeps the plugin out of the web bundle and avoids any
-// SSR issues during Next.js static generation.
-async function getNativeTTS() {
-  if (typeof window === "undefined" || !Capacitor.isNativePlatform()) return null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod: any = await import("@capacitor-community/text-to-speech");
-    return mod.TextToSpeech ?? null;
-  } catch {
-    return null;
-  }
-}
-
 // Android WebView returns an empty voices array until the voiceschanged event
 // fires. Wait up to 1.5 s before giving up and using whatever is available.
 async function getWebVoices(): Promise<SpeechSynthesisVoice[]> {
@@ -32,29 +16,19 @@ async function getWebVoices(): Promise<SpeechSynthesisVoice[]> {
 }
 
 export async function speakCzech(text: string, rate = 0.85): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
-  // Native path: use the device TTS engine (works reliably on Android/iOS)
-  const tts = await getNativeTTS();
-  if (tts) {
-    try {
-      await tts.speak({ text, lang: "cs-CZ", rate, pitch: 1.0, volume: 1.0 });
-      return;
-    } catch {
-      // Fall through to web fallback if the plugin fails at runtime
-    }
-  }
-
-  // Web path: use the browser's Web Speech API
-  if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
-
   const voices = await getWebVoices();
+
+  // Android WebView bug: speak() silently fails when called in the same tick
+  // as cancel(). A short pause lets the engine reset before the next utterance.
+  await new Promise<void>((r) => setTimeout(r, 50));
+
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "cs-CZ";
   u.rate = rate;
   u.pitch = 1;
-  // Prefer a Czech voice; fall back to whatever the browser selects
   u.voice = voices.find((v) => v.lang.startsWith("cs")) ?? null;
   window.speechSynthesis.speak(u);
 }
@@ -65,15 +39,6 @@ export async function speakCzechSlow(text: string): Promise<void> {
 
 export async function stopSpeaking(): Promise<void> {
   if (typeof window === "undefined") return;
-
-  const tts = await getNativeTTS();
-  if (tts) {
-    try {
-      await tts.stop();
-      return;
-    } catch {}
-  }
-
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }

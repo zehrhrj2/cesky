@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
+import type { WordDifficulty } from "@/lib/store";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import type { Word } from "@/types";
@@ -10,19 +11,19 @@ import type { Word } from "@/types";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ExType = "flashcard" | "mc-cz" | "mc-native" | "context";
+type DiffFilter = "all" | WordDifficulty;
 
 interface Exercise {
   type: ExType;
   word: Word;
   options: string[];
-  correctIdx: number; // -1 for flashcard
+  correctIdx: number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const shuffle = <T,>(a: T[]): T[] => [...a].sort(() => Math.random() - 0.5);
 
-/** Weighted random sampling — words with higher scores surface more often. */
 function weightedSample(words: Word[], scores: Record<string, number>, n: number): Word[] {
   const pool = [...words];
   const out: Word[] = [];
@@ -44,36 +45,25 @@ function weightedSample(words: Word[], scores: Record<string, number>, n: number
   return out;
 }
 
-/** Pick a random exercise type. mc-cz is weighted 2× since it's most useful. */
 function randomType(canMC: boolean): ExType {
   if (!canMC) return "flashcard";
   const pool: ExType[] = ["flashcard", "mc-cz", "mc-cz", "mc-native", "context"];
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function buildExercise(
-  word: Word,
-  allWords: Word[],
-  lang: "ua" | "ru",
-  canMC: boolean
-): Exercise {
+function buildExercise(word: Word, allWords: Word[], lang: "ua" | "ru", canMC: boolean): Exercise {
   const type = randomType(canMC);
-  if (type === "flashcard") {
-    return { type, word, options: [], correctIdx: -1 };
-  }
+  if (type === "flashcard") return { type, word, options: [], correctIdx: -1 };
 
   const distractors = shuffle(allWords.filter((w) => w.cz !== word.cz)).slice(0, 3);
 
   if (type === "mc-cz") {
-    // Show Czech word → pick native translation
     const correct = lang === "ua" ? word.ua : word.ru;
     const wrong = distractors.map((w) => (lang === "ua" ? w.ua : w.ru));
     const options = shuffle([correct, ...wrong]);
     return { type, word, options, correctIdx: options.indexOf(correct) };
   }
 
-  // mc-native: show native word → pick Czech
-  // context:   show native example sentence → pick Czech word
   const correct = word.cz;
   const wrong = distractors.map((w) => w.cz);
   const options = shuffle([correct, ...wrong]);
@@ -81,13 +71,14 @@ function buildExercise(
 }
 
 function buildSession(
-  learnedWords: Word[],
+  practiceWords: Word[],
+  allWords: Word[],
   scores: Record<string, number>,
   lang: "ua" | "ru"
 ): Exercise[] {
-  const words = weightedSample(learnedWords, scores, 10);
-  const canMC = learnedWords.length >= 4;
-  return words.map((w) => buildExercise(w, learnedWords, lang, canMC));
+  const words = weightedSample(practiceWords, scores, 10);
+  const canMC = allWords.length >= 4;
+  return words.map((w) => buildExercise(w, allWords, lang, canMC));
 }
 
 // ─── UI Strings ───────────────────────────────────────────────────────────────
@@ -101,6 +92,7 @@ const S = {
     toHome: "На головну",
     empty: "Пройдіть хоча б один урок, щоб розпочати практику",
     emptyBtn: "Перейти до уроків",
+    emptyFilter: "Немає слів з таким рівнем. Оцініть слова у словнику.",
     typesTitle: "Типи вправ у сесії:",
     types: [
       { icon: "🃏", label: "Картки — вивчення слів" },
@@ -108,6 +100,10 @@ const S = {
       { icon: "🔄", label: "Переклад → чеське слово" },
       { icon: "📖", label: "Контекст речення" },
     ],
+    filterAll: "Всі",
+    filterEasy: "Легкі",
+    filterMedium: "Середні",
+    filterHard: "Важкі",
     reveal: "Показати переклад",
     easy: "Легко ✓",
     hard: "Важко ✗",
@@ -134,6 +130,7 @@ const S = {
     toHome: "На главную",
     empty: "Пройдите хотя бы один урок, чтобы начать практику",
     emptyBtn: "Перейти к урокам",
+    emptyFilter: "Нет слов с таким уровнем. Оцените слова в словаре.",
     typesTitle: "Типы упражнений в сессии:",
     types: [
       { icon: "🃏", label: "Карточки — изучение слов" },
@@ -141,6 +138,10 @@ const S = {
       { icon: "🔄", label: "Перевод → чешское слово" },
       { icon: "📖", label: "Контекст предложения" },
     ],
+    filterAll: "Все",
+    filterEasy: "Лёгкие",
+    filterMedium: "Средние",
+    filterHard: "Сложные",
     reveal: "Показать перевод",
     easy: "Легко ✓",
     hard: "Сложно ✗",
@@ -168,11 +169,15 @@ export default function PracticePage() {
   const lang = useStore((s) => s.lang);
   const learnedWords = useStore((s) => s.learnedWords);
   const wordScores = useStore((s) => s.wordScores);
+  const wordDifficulty = useStore((s) => s.wordDifficulty);
   const updateWordScore = useStore((s) => s.updateWordScore);
+  const setWordDifficulty = useStore((s) => s.setWordDifficulty);
   const addXp = useStore((s) => s.addXp);
 
   const t = S[lang];
 
+  const [mounted, setMounted] = useState(false);
+  const [diffFilter, setDiffFilter] = useState<DiffFilter>("all");
   const [phase, setPhase] = useState<"ready" | "session" | "done">("ready");
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [idx, setIdx] = useState(0);
@@ -182,18 +187,38 @@ export default function PracticePage() {
   const [finalScore, setFinalScore] = useState({ correct: 0, total: 0 });
   const [displayXP, setDisplayXP] = useState(0);
 
-  // Refs avoid stale-closure issues when computing final totals
   const xpRef = useRef(0);
   const correctRef = useRef(0);
   const mcTotalRef = useRef(0);
 
+  useEffect(() => {
+    setMounted(true);
+    const saved = sessionStorage.getItem("practiceFilter");
+    if (saved === "easy" || saved === "medium" || saved === "hard") {
+      setDiffFilter(saved);
+      sessionStorage.removeItem("practiceFilter");
+    }
+  }, []);
+
+  const filteredWords =
+    diffFilter === "all"
+      ? learnedWords
+      : learnedWords.filter((w) => wordDifficulty[w.cz] === diffFilter);
+
   const hasEnough = learnedWords.length >= 4;
+
+  const diffCounts: Record<DiffFilter, number> = {
+    all: learnedWords.length,
+    easy: learnedWords.filter((w) => wordDifficulty[w.cz] === "easy").length,
+    medium: learnedWords.filter((w) => wordDifficulty[w.cz] === "medium").length,
+    hard: learnedWords.filter((w) => wordDifficulty[w.cz] === "hard").length,
+  };
 
   function startSession() {
     xpRef.current = 0;
     correctRef.current = 0;
     mcTotalRef.current = 0;
-    const exs = buildSession(learnedWords, wordScores, lang);
+    const exs = buildSession(filteredWords, learnedWords, wordScores, lang);
     setExercises(exs);
     setIdx(0);
     setFlipped(false);
@@ -219,6 +244,7 @@ export default function PracticePage() {
 
   function handleFlashcardRate(easy: boolean) {
     updateWordScore(current.word.cz, easy);
+    setWordDifficulty(current.word.cz, easy ? "easy" : "hard");
     const gain = easy ? 3 : 1;
     xpRef.current += gain;
     setDisplayXP((p) => p + gain);
@@ -228,9 +254,7 @@ export default function PracticePage() {
   function advanceOrFinish() {
     if (idx + 1 >= exercises.length) {
       const bonus =
-        mcTotalRef.current > 0 && correctRef.current / mcTotalRef.current >= 0.7
-          ? 20
-          : 0;
+        mcTotalRef.current > 0 && correctRef.current / mcTotalRef.current >= 0.7 ? 20 : 0;
       const total = xpRef.current + bonus;
       addXp(total);
       setFinalXP(total);
@@ -243,7 +267,34 @@ export default function PracticePage() {
     }
   }
 
+  // ── Skeleton ───────────────────────────────────────────────────────────────
+
+  if (!mounted) {
+    return (
+      <>
+        <Header />
+        <main style={{ padding: "20px 20px 100px" }}>
+          <div style={{ marginBottom: 24 }}>
+            <div className="skeleton" style={{ height: 32, width: "60%", marginBottom: 8 }} />
+            <div className="skeleton" style={{ height: 16, width: "40%" }} />
+          </div>
+          <div className="skeleton" style={{ height: 90, marginBottom: 16 }} />
+          <div className="skeleton" style={{ height: 160, marginBottom: 24 }} />
+          <div className="skeleton" style={{ height: 52 }} />
+        </main>
+        <BottomNav />
+      </>
+    );
+  }
+
   // ── Ready ──────────────────────────────────────────────────────────────────
+
+  const diffOptions: { key: DiffFilter; label: string; color: string }[] = [
+    { key: "all", label: t.filterAll, color: "var(--text2)" },
+    { key: "easy", label: t.filterEasy, color: "var(--green)" },
+    { key: "medium", label: t.filterMedium, color: "var(--accent)" },
+    { key: "hard", label: t.filterHard, color: "var(--red)" },
+  ];
 
   if (phase === "ready") {
     return (
@@ -273,36 +324,70 @@ export default function PracticePage() {
             </div>
           ) : (
             <>
-              <div className="app-card" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 16 }}>
-                <div style={{ fontSize: 48 }}>🎯</div>
-                <div>
-                  <div style={{ fontSize: 32, fontWeight: 900, color: "var(--accent)" }}>
-                    {learnedWords.length}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--text2)" }}>{t.wordsReady}</div>
-                </div>
+              {/* Difficulty filter */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                {diffOptions.map(({ key, label, color }) => {
+                  const active = diffFilter === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setDiffFilter(key)}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        border: `1.5px solid ${active ? color : "var(--card-border)"}`,
+                        background: active ? `color-mix(in srgb, ${color} 15%, transparent)` : "var(--card)",
+                        color: active ? color : "var(--text2)",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {label} ({diffCounts[key]})
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="app-card" style={{ marginBottom: 24 }}>
-                <div
-                  style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 12 }}
-                >
-                  {t.typesTitle}
+              {filteredWords.length === 0 ? (
+                <div className="app-card" style={{ textAlign: "center", padding: 24 }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>🏷️</div>
+                  <div style={{ fontSize: 14, color: "var(--text2)" }}>{t.emptyFilter}</div>
                 </div>
-                {t.types.map((item) => (
-                  <div
-                    key={item.icon}
-                    style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}
-                  >
-                    <span style={{ fontSize: 18 }}>{item.icon}</span>
-                    <span style={{ fontSize: 13, color: "var(--text2)" }}>{item.label}</span>
+              ) : (
+                <>
+                  <div className="app-card" style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ fontSize: 48 }}>🎯</div>
+                    <div>
+                      <div style={{ fontSize: 32, fontWeight: 900, color: "var(--accent)" }}>
+                        {filteredWords.length}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text2)" }}>{t.wordsReady}</div>
+                    </div>
                   </div>
-                ))}
-              </div>
 
-              <button className="btn-primary" onClick={startSession}>
-                {t.start}
-              </button>
+                  <div className="app-card" style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 12 }}>
+                      {t.typesTitle}
+                    </div>
+                    {t.types.map((item) => (
+                      <div
+                        key={item.icon}
+                        style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}
+                      >
+                        <span style={{ fontSize: 18 }}>{item.icon}</span>
+                        <span style={{ fontSize: 13, color: "var(--text2)" }}>{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button className="btn-primary" onClick={startSession}>
+                    {t.start}
+                  </button>
+                </>
+              )}
             </>
           )}
         </main>
@@ -315,9 +400,7 @@ export default function PracticePage() {
 
   if (phase === "done") {
     const pct =
-      finalScore.total > 0
-        ? Math.round((finalScore.correct / finalScore.total) * 100)
-        : null;
+      finalScore.total > 0 ? Math.round((finalScore.correct / finalScore.total) * 100) : null;
 
     return (
       <>
@@ -328,18 +411,10 @@ export default function PracticePage() {
 
           <div
             className="app-card"
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 0,
-              marginBottom: 32,
-              overflow: "hidden",
-            }}
+            style={{ display: "flex", justifyContent: "center", gap: 0, marginBottom: 32, overflow: "hidden" }}
           >
             <div style={{ flex: 1, padding: 20, textAlign: "center" }}>
-              <div style={{ fontSize: 36, fontWeight: 900, color: "var(--accent)" }}>
-                {finalXP}
-              </div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: "var(--accent)" }}>{finalXP}</div>
               <div style={{ fontSize: 12, color: "var(--text2)" }}>{t.xpEarned}</div>
             </div>
             {pct !== null && (
@@ -350,12 +425,7 @@ export default function PracticePage() {
                     style={{
                       fontSize: 36,
                       fontWeight: 900,
-                      color:
-                        pct >= 70
-                          ? "var(--green)"
-                          : pct >= 50
-                          ? "var(--accent)"
-                          : "var(--red)",
+                      color: pct >= 70 ? "var(--green)" : pct >= 50 ? "var(--accent)" : "var(--red)",
                     }}
                   >
                     {pct}%
@@ -389,7 +459,6 @@ export default function PracticePage() {
 
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", minHeight: "100vh" }}>
-      {/* Mini header with progress */}
       <div
         style={{
           position: "sticky",
@@ -399,9 +468,7 @@ export default function PracticePage() {
           padding: "14px 20px 10px",
         }}
       >
-        <div
-          style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}
-        >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
           <button
             onClick={() => setPhase("ready")}
             style={{
@@ -461,24 +528,12 @@ interface CardProps {
   onNext: () => void;
 }
 
-function ExerciseCard({
-  exercise,
-  lang,
-  flipped,
-  selectedOpt,
-  t,
-  onFlip,
-  onRate,
-  onSelect,
-  onNext,
-}: CardProps) {
+function ExerciseCard({ exercise, lang, flipped, selectedOpt, t, onFlip, onRate, onSelect, onNext }: CardProps) {
   const { type, word, options, correctIdx } = exercise;
   const native = lang === "ua" ? word.ua : word.ru;
   const exampleNative = lang === "ua" ? word.exampleUa : word.exampleRu;
   const noteNative = lang === "ua" ? word.note_ua : word.note_ru;
   const answered = selectedOpt !== null;
-
-  // ── Flashcard ──────────────────────────────────────────────────────────────
 
   if (type === "flashcard") {
     return (
@@ -528,21 +583,12 @@ function ExerciseCard({
             </>
           ) : (
             <div className="animate-fade-in" style={{ width: "100%" }}>
-              <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 6 }}>
-                {word.cz}
-              </div>
+              <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 6 }}>{word.cz}</div>
               <div style={{ fontSize: 26, fontWeight: 800, color: "var(--accent)", marginBottom: 10 }}>
                 {native}
               </div>
               {exampleNative && (
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: "var(--text2)",
-                    fontStyle: "italic",
-                    marginBottom: 8,
-                  }}
-                >
+                <div style={{ fontSize: 13, color: "var(--text2)", fontStyle: "italic", marginBottom: 8 }}>
                   {exampleNative}
                 </div>
               )}
@@ -565,10 +611,7 @@ function ExerciseCard({
         </div>
 
         {flipped && (
-          <div
-            className="animate-fade-in"
-            style={{ display: "flex", gap: 12, marginTop: 20 }}
-          >
+          <div className="animate-fade-in" style={{ display: "flex", gap: 12, marginTop: 20 }}>
             <button
               onClick={() => onRate(false)}
               style={{
@@ -586,11 +629,7 @@ function ExerciseCard({
             >
               {t.hard}
             </button>
-            <button
-              className="btn-primary"
-              onClick={() => onRate(true)}
-              style={{ flex: 1 }}
-            >
+            <button className="btn-primary" onClick={() => onRate(true)} style={{ flex: 1 }}>
               {t.easy}
             </button>
           </div>
@@ -599,20 +638,11 @@ function ExerciseCard({
     );
   }
 
-  // ── Multiple Choice ────────────────────────────────────────────────────────
-
   const questionLabel =
     type === "mc-cz" ? t.qMcCz : type === "mc-native" ? t.qMcNative : t.qContext;
-
   const questionDisplay =
-    type === "mc-cz"
-      ? word.cz
-      : type === "mc-native"
-      ? native
-      : exampleNative || native; // context: show example sentence
-
-  const typeEmoji =
-    type === "mc-cz" ? "🎯" : type === "mc-native" ? "🔄" : "📖";
+    type === "mc-cz" ? word.cz : type === "mc-native" ? native : exampleNative || native;
+  const typeEmoji = type === "mc-cz" ? "🎯" : type === "mc-native" ? "🔄" : "📖";
 
   return (
     <div className="animate-slide-in">
@@ -629,7 +659,6 @@ function ExerciseCard({
         {typeEmoji} {questionLabel}
       </div>
 
-      {/* Question display */}
       <div
         className="app-card"
         style={{
@@ -645,7 +674,6 @@ function ExerciseCard({
         {questionDisplay}
       </div>
 
-      {/* Options */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
         {options.map((opt, i) => {
           let cls = "quiz-option";
@@ -661,7 +689,6 @@ function ExerciseCard({
         })}
       </div>
 
-      {/* Feedback */}
       {answered && (
         <div className="animate-fade-in">
           {selectedOpt === correctIdx ? (
@@ -690,9 +717,7 @@ function ExerciseCard({
                 marginBottom: 12,
               }}
             >
-              <div style={{ color: "var(--red)", fontWeight: 700, marginBottom: 4 }}>
-                ❌ {t.wrong}
-              </div>
+              <div style={{ color: "var(--red)", fontWeight: 700, marginBottom: 4 }}>❌ {t.wrong}</div>
               <div style={{ fontSize: 13, color: "var(--text2)" }}>
                 {t.correctAnswer}:{" "}
                 <strong style={{ color: "var(--text)" }}>{options[correctIdx]}</strong>
@@ -700,7 +725,6 @@ function ExerciseCard({
             </div>
           )}
 
-          {/* Hint shown after wrong answer or for mc-cz */}
           {noteNative && (selectedOpt !== correctIdx || type === "mc-cz") && (
             <div
               style={{

@@ -4,6 +4,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Lang, UserStats, Word } from "@/types";
 
+export type WordDifficulty = "easy" | "medium" | "hard";
+
 interface AppStore extends UserStats {
   // UI state
   lang: Lang;
@@ -16,6 +18,7 @@ interface AppStore extends UserStats {
   hasCompletedAlphabet: boolean;
   learnedWords: Word[];
   wordScores: Record<string, number>;
+  wordDifficulty: Record<string, WordDifficulty>;
 
   // Actions
   setLang: (lang: Lang) => void;
@@ -31,6 +34,7 @@ interface AppStore extends UserStats {
   completeAlphabet: () => void;
   addLearnedWords: (words: Word[]) => void;
   updateWordScore: (cz: string, correct: boolean) => void;
+  setWordDifficulty: (cz: string, difficulty: WordDifficulty) => void;
 }
 
 export const useStore = create<AppStore>()(
@@ -53,6 +57,7 @@ export const useStore = create<AppStore>()(
       hasCompletedAlphabet: false,
       learnedWords: [],
       wordScores: {},
+      wordDifficulty: {},
 
       setLang: (lang) => set({ lang }),
       setDark: (dark) => set({ dark }),
@@ -102,6 +107,11 @@ export const useStore = create<AppStore>()(
           },
         })),
 
+      setWordDifficulty: (cz, difficulty) =>
+        set((state) => ({
+          wordDifficulty: { ...state.wordDifficulty, [cz]: difficulty },
+        })),
+
       incrementChatMessages: () =>
         set((state) => ({
           chatMessagesCount: state.chatMessagesCount + 1,
@@ -145,6 +155,7 @@ export const useStore = create<AppStore>()(
         hasCompletedAlphabet: state.hasCompletedAlphabet,
         learnedWords: state.learnedWords,
         wordScores: state.wordScores,
+        wordDifficulty: state.wordDifficulty,
       }),
     }
   )

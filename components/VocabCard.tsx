@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { speakCzech, speakCzechSlow } from "@/lib/speech";
+import { useStore } from "@/lib/store";
+import type { WordDifficulty } from "@/lib/store";
 import type { Word } from "@/types";
 import type { Lang } from "@/types";
 
@@ -14,10 +16,14 @@ interface VocabCardProps {
   t: Record<string, string>;
 }
 
+const DIFFICULTIES: WordDifficulty[] = ["easy", "medium", "hard"];
+
 export function VocabCard({ word, lang, index, total, onNext, t }: VocabCardProps) {
   const [flipped, setFlipped] = useState(false);
+  const setWordDifficulty = useStore((s) => s.setWordDifficulty);
 
-  const handleNext = () => {
+  const handleNext = (difficulty?: WordDifficulty) => {
+    if (difficulty) setWordDifficulty(word.cz, difficulty);
     setFlipped(false);
     onNext();
   };
@@ -193,7 +199,7 @@ export function VocabCard({ word, lang, index, total, onNext, t }: VocabCardProp
             return (
               <button
                 key={i}
-                onClick={handleNext}
+                onClick={() => handleNext(DIFFICULTIES[i])}
                 style={{
                   flex: 1,
                   padding: "10px 4px",
@@ -217,7 +223,7 @@ export function VocabCard({ word, lang, index, total, onNext, t }: VocabCardProp
 
       {/* Next button (before flip) */}
       {!flipped && (
-        <button className="btn-primary" onClick={handleNext} style={{ marginTop: 16 }}>
+        <button className="btn-primary" onClick={() => handleNext()} style={{ marginTop: 16 }}>
           {index < total - 1 ? t.next : `${t.quiz} →`}
         </button>
       )}
